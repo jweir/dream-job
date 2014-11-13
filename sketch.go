@@ -42,13 +42,12 @@ func (s *Schedule) expand(t time.Time, w time.Duration) (times []time.Time) {
 	return
 }
 
-func (s *Schedule) Start() {
+func (s *Schedule) Start(suc chan (*Schedule)) {
 	for {
 		d := s.cron.Next(time.Now()).Sub(time.Now())
 		time.Sleep(d)
-		log.Printf("tick %s\n", s.Job.Name)
+		suc <- s
 	}
-
 }
 
 func NewSchedule(when string, j *Job) *Schedule {
@@ -60,13 +59,17 @@ func NewSchedule(when string, j *Job) *Schedule {
 }
 
 func main() {
+	suc := make(chan (*Schedule))
 	S := NewSchedule("*/5 * * * * * *", &Job{Name: "A"})
-	go S.Start()
+	go S.Start(suc)
 
 	X := NewSchedule("*/30 * * * * * *", &Job{Name: "B"})
-	go X.Start()
+	go X.Start(suc)
 
 	for {
-		time.Sleep(time.Minute)
+		select {
+		case event := <-suc:
+			log.Printf("got message from %s", event.Job.Name)
+		}
 	}
 }
